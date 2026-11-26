@@ -41,13 +41,17 @@ def set_size(fd, rows, cols):
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
 
 
-def run_pty(args, steps=(), size=(40, 120), env=None, timeout=15.0, use_ascii_art=True, source_tree=True):
-    """Run `python -m ascii_art args` (or a raw python command) on a pty.
+def run_pty(args, steps=(), size=(40, 120), env=None, timeout=30.0, use_ascii_art=True, source_tree=True):
+    """Run `python -m ascii_art args` (or a raw python command) on a pty and return (exit code, output).
 
-    `steps` is a list of (delay_seconds, bytes | ("resize", rows, cols)) actions. Returns (exit code, output).
+    `steps` is a list of (delay_seconds, action) with action one of: bytes to type, ("resize", rows, cols),
+    ("signal", signum), ("split", first, second, gap_seconds). Delays count from the moment the program
+    enters the alternate screen (after its own terminal setup), so a cold start cannot swallow the keys.
+    The pty's termios settings must be the same after the program ends as before it started.
     """
     master, slave = os.openpty()
     set_size(master, *size)
+    termios_before = termios.tcgetattr(master)
     full_env = {"PATH": os.environ["PATH"], "HOME": os.environ["HOME"], "COLORTERM": "truecolor", "TERM": "xterm-256color"}
     if source_tree:
         full_env["PYTHONPATH"] = SRC
@@ -56,10 +60,12 @@ def run_pty(args, steps=(), size=(40, 120), env=None, timeout=15.0, use_ascii_ar
     proc = subprocess.Popen(cmd, stdin=slave, stdout=slave, stderr=slave, env=full_env, start_new_session=True,
                             preexec_fn=child_setup)
     os.close(slave)
-    out, start = b"", time.monotonic()
+    out, spawned, start = b"", time.monotonic(), None
     pending = sorted(steps, key=lambda s: s[0])
     while True:
-        now = time.monotonic() - start
+        if start is None and ALT_ON in out:
+            start = time.monotonic()
+        now = 0.0 if start is None else time.monotonic() - start
         while pending and pending[0][0] <= now:
             _, action = pending.pop(0)
             if isinstance(action, tuple) and action[0] == "split":
@@ -83,12 +89,15 @@ def run_pty(args, steps=(), size=(40, 120), env=None, timeout=15.0, use_ascii_ar
             out += chunk
         if proc.poll() is not None and not select.select([master], [], [], 0.1)[0]:
             break
-        if now > timeout:
+        if time.monotonic() - spawned > timeout:
             proc.kill()
             os.close(master)
             pytest.fail(f"timed out; output tail: {out[-300:]!r}")
+    code = proc.wait()
+    termios_after = termios.tcgetattr(master)
     os.close(master)
-    return proc.wait(), out
+    assert termios_after == termios_before, "terminal settings were not restored"
+    return code, out
 
 
 def assert_clean(code, out):
@@ -201,29 +210,25 @@ def test_menu_restores_terminal_on_fatal_signals(action):
     assert out.rstrip().endswith(ALT_OFF) and CURSOR_ON in out
 
 
-@pytest.mark.parametrize("second", [("signal", signal.SIGTERM), ("signal", signal.SIGHUP), ("signal", signal.SIGINT)])
-def test_signal_while_leaving_menu_still_restores_termios(second):
-    """A second signal right after `q` must not abort the termios restore."""
-    code, out = menu([(0.8, b"q"), (0.8, second)])
-    assert out.rstrip().endswith(ALT_OFF)
-    assert b"Traceback" not in out
+@pytest.mark.parametrize("sig", [signal.SIGTERM, signal.SIGHUP, signal.SIGINT])
+def test_signal_right_after_quit_still_restores_the_terminal(sig):
+    """The signal lands in the same tick as `q`, i.e. while the menu is leaving; run_pty checks termios afterwards."""
+    code, out = menu([(0.5, b"q"), (0.5, ("signal", sig))])
+    assert out.rstrip().endswith(ALT_OFF) and b"Traceback" not in out
 
 
-def test_menu_arrow_key_split_across_reads():
-    code, out = menu([(0.8, ("split", b"\x1b", b"[B", 0.02)), (1.2, b"\r")])
-    assert code == 0 and b"RAN xmas-tree " in out
+@pytest.mark.parametrize("keys", [b"\x1b[3~", b"\x1b[1~", b"\x1b[1;5B", b"\x1b[15~", b"\x1bj", b"\x1b[<0;5;5M", b"\x1bOP", b"\x1b2", b"\x1b[200~12\x1b[201~"])
+def test_menu_treats_other_escape_sequences_as_ignored_keys(keys):
+    """Enter afterwards must still run the FIRST art: nothing in the sequence moved the selection or picked an art."""
+    code, out = menu([(0.5, keys), (1.0, b"\r")])
+    assert code == 0 and b"RAN clownfish" in out
 
 
-@pytest.mark.parametrize("keys", [b"\x1b[3~", b"\x1b[1~", b"\x1b[1;5B", b"\x1b[15~", b"\x1bj", b"\x1b[<0;5;5M", b"\x1bOP"])
-def test_menu_ignores_unrecognised_escape_sequences(keys):
-    code, out = menu([(0.8, keys), (1.4, b"q")])
-    assert code == 0 and b"RAN" not in out and b"Traceback" not in out
-
-
-@pytest.mark.parametrize("first,second", [(b"\x1b[", b"B"), (b"\x1bO", b"B"), (b"\x1b[1;", b"5B")])
-def test_menu_sequence_split_after_bracket(first, second):
-    code, out = menu([(0.8, ("split", first, second + b"\r", 0.02))])
-    assert code == 0 and (b"RAN xmas-tree " in out or b"RAN clownfish" in out)
+@pytest.mark.parametrize("first,second,expected", [(b"\x1b[", b"B\r", b"RAN xmas-tree "), (b"\x1bO", b"B\r", b"RAN xmas-tree "),
+                                                   (b"\x1b[1;", b"5B\r", b"RAN clownfish"), (b"\x1b", b"[B\r", b"RAN xmas-tree ")])
+def test_menu_sequence_split_across_reads(first, second, expected):
+    code, out = menu([(0.5, ("split", first, second, 0.02))])
+    assert code == 0 and expected in out
 
 
 def test_menu_survives_closed_stdin():

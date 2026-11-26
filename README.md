@@ -37,7 +37,7 @@ git clone https://github.com/navarro165/ascii-art-collection && cd ascii-art-col
 tools/build_binary.sh && tools/install_binary.sh
 ```
 
-The bundle is a folder (about 32 MB) installed under `~/.local/share/ascii-art/<version>/`, with the four
+The bundle is a folder (roughly 25 to 35 MB, depending on the Python uv picks) installed under `~/.local/share/ascii-art/<version>/`, with the four
 commands linked into `~/.local/bin`. Set `PREFIX` or `BIN_DIR` to put them elsewhere. It is a folder rather
 than a single file because a one-file build unpacks itself on every launch: here the first run takes about
 2 seconds and every later run about 0.1 s. It is built where it runs, so macOS has nothing to quarantine; a copy

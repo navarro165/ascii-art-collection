@@ -60,11 +60,36 @@ def test_version_line_with_trailing_comment_is_read_cleanly(tmp_path):
     assert (tmp_path / "share" / "1.0" / "ascii-art").exists()
 
 
-def test_path_like_version_is_rejected_before_anything_is_removed(tmp_path):
-    for bad in ('__version__ = "../evil"', '__version__ = ".."', '__version__ = "a/b"'):
-        repo = fake_repo(tmp_path / bad.replace("/", "_").replace(" ", "").replace('"', "").replace("=", "_"), bad)
-        victim = tmp_path / "victim"
-        victim.mkdir(exist_ok=True)
-        (victim / "f").write_text("x")
+def test_path_like_or_overlong_versions_are_rejected_without_creating_anything(tmp_path):
+    for n, bad in enumerate(('__version__ = "../evil"', '__version__ = ".."', '__version__ = "a/b"', '__version__ = "' + "9" * 80 + '"')):
+        repo = fake_repo(tmp_path / str(n), bad)
         result = install(repo, tmp_path, PREFIX=str(tmp_path / "share"), BIN_DIR=str(tmp_path / "bin"))
-        assert result.returncode != 0 and (victim / "f").exists()
+        assert result.returncode != 0
+        assert not (tmp_path / "share").exists() and not (tmp_path / "bin").exists()
+
+
+def test_a_refused_run_creates_no_directories(tmp_path):
+    repo, bin_dir = fake_repo(tmp_path), tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "clownfish").write_text("not ours")
+    assert install(repo, tmp_path, PREFIX=str(tmp_path / "share"), BIN_DIR=str(bin_dir)).returncode == 1
+    assert not (tmp_path / "share").exists()
+
+
+def test_rerun_with_extra_trailing_slashes_still_recognises_its_own_links(tmp_path):
+    repo = fake_repo(tmp_path)
+    env = {"BIN_DIR": str(tmp_path / "bin")}
+    assert install(repo, tmp_path, PREFIX=str(tmp_path / "share"), **env).returncode == 0
+    again = install(repo, tmp_path, PREFIX=str(tmp_path / "share") + "//", **env)
+    assert again.returncode == 0, again.stderr
+
+
+def test_a_link_to_the_installed_directory_does_not_destroy_the_install(tmp_path):
+    repo = fake_repo(tmp_path)
+    share, bin_dir = tmp_path / "share", tmp_path / "bin"
+    assert install(repo, tmp_path, PREFIX=str(share), BIN_DIR=str(bin_dir)).returncode == 0
+    (bin_dir / "clownfish").unlink()
+    (bin_dir / "clownfish").symlink_to(share / "0.1.0")
+    assert install(repo, tmp_path, PREFIX=str(share), BIN_DIR=str(bin_dir)).returncode == 0
+    assert (share / "0.1.0" / "ascii-art").is_file() and not (share / "0.1.0" / "ascii-art").is_symlink()
+    assert (bin_dir / "ascii-art").resolve() == (share / "0.1.0" / "ascii-art").resolve()

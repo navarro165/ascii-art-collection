@@ -3,6 +3,7 @@
 `choose` returns the picked name (or None) after putting the terminal back exactly as it found it,
 so the caller can start an art, which sets up its own screen, from a clean state.
 """
+import errno
 import os
 import select
 import signal
@@ -24,6 +25,17 @@ def write_all(fd, text):
             view = view[os.write(fd, view):]
         except BlockingIOError:
             select.select([], [fd], [], 0.05)
+
+
+def restore_termios(fd, saved):
+    """tcsetattr, retried when a signal interrupts it (Python does not retry termios calls itself)."""
+    while True:
+        try:
+            termios.tcsetattr(fd, termios.TCSADRAIN, saved)
+            return
+        except termios.error as error:
+            if error.args[0] != errno.EINTR:
+                raise
 
 
 def sequence_length(data, i):
@@ -79,10 +91,11 @@ def cut_off(data):
 def read_keys(fd):
     """Read pending input, waiting briefly for the rest of an escape sequence that was split across reads."""
     data = os.read(fd, 1024)
-    while cut_off(data):
-        if not select.select([fd], [], [], 0.05)[0]:
+    while data and cut_off(data) and select.select([fd], [], [], 0.05)[0]:
+        more = os.read(fd, 1024)
+        if not more:
             break
-        data += os.read(fd, 1024)
+        data += more
     return data
 
 
@@ -99,10 +112,10 @@ def frame(entries, index, cols, rows):
     lines = [f"{ESC}[1mASCII ART COLLECTION{ESC}[0m", ""]
     for i, (n, _, _) in enumerate(entries):
         row = f"  {i + 1}  {n}  "
-        lines.append(f" {ESC}[7m{row:<{min(cols, 30)}}{ESC}[0m" if i == index else row)
+        lines.append(f"{ESC}[7m{row:<{min(cols - 1, 30)}}{ESC}[0m" if i == index else row)
     lines += ["", clip(blurb, cols - 2), clip(f"credit: {credit}", cols - 2), "", f"run directly: ascii-art {name}", "",
               clip(f"up/down or j/k move, Enter run, 1-{len(entries)} pick, q quit", cols - 2)]
-    return f"{ESC}[2J{ESC}[H" + "\r\n".join(line if line.startswith((ESC, " ")) else " " + line for line in lines[: rows - 1])
+    return f"{ESC}[2J{ESC}[H" + "\r\n".join(" " + line for line in lines[: rows - 1])
 
 
 def choose(entries):
@@ -110,13 +123,23 @@ def choose(entries):
     fd_in, fd_out = sys.stdin.fileno(), sys.stdout.fileno()
     saved = termios.tcgetattr(fd_in)
     dirty = [True]
+    leaving, pending = [False], []
 
-    def stop(signum, _frame):
-        raise SystemExit(128 + signum)
+    def fatal(signum, _frame):
+        if leaving[0]:
+            pending.append(signum)
+        else:
+            raise SystemExit(128 + signum)
 
-    handlers = {signal.SIGWINCH: lambda *_: dirty.__setitem__(0, True)}
-    handlers.update({sig: stop for sig in (signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT, signal.SIGTSTP)})
-    old_handlers = {sig: signal.getsignal(sig) for sig in (*handlers, signal.SIGINT)}
+    def interrupt(signum, _frame):
+        if leaving[0]:
+            pending.append(signum)
+        else:
+            raise KeyboardInterrupt
+
+    handlers = {signal.SIGWINCH: lambda *_: dirty.__setitem__(0, True), signal.SIGINT: interrupt}
+    handlers.update({sig: fatal for sig in (signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT, signal.SIGTSTP)})
+    old_handlers = {sig: signal.getsignal(sig) for sig in handlers}
     for sig, handler in handlers.items():
         signal.signal(sig, handler)
     index = 0
@@ -147,10 +170,11 @@ def choose(entries):
     except KeyboardInterrupt:
         return None
     finally:
-        # Restoring the terminal must not be interrupted half way by a second signal or Ctrl-C.
-        for sig in old_handlers:
-            signal.signal(sig, signal.SIG_IGN)
+        # A signal that lands while the terminal is being put back waits until it is done, then ends the run.
+        leaving[0] = True
         write_all(fd_out, LEAVE)
-        termios.tcsetattr(fd_in, termios.TCSADRAIN, saved)
+        restore_termios(fd_in, saved)
         for sig, old in old_handlers.items():
             signal.signal(sig, old)
+        if pending:
+            raise SystemExit(128 + pending[0])

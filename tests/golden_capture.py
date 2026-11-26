@@ -3,7 +3,7 @@
 The committed digests were captured from the single-file scripts as they were before they moved into the
 package (clownfish_term.py as of the first commit; the tree scripts are the earlier standalone versions).
 
-usage: golden.py <clownfish|tree> <file path or dotted module> <out.json>
+usage: golden_capture.py <clownfish|tree|tree-v1> <file path or dotted module> <out.json>
 """
 import hashlib
 import importlib
