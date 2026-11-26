@@ -35,14 +35,16 @@ def set_size(fd, rows, cols):
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
 
 
-def run_pty(args, steps=(), size=(40, 120), env=None, timeout=15.0, use_ascii_art=True):
+def run_pty(args, steps=(), size=(40, 120), env=None, timeout=15.0, use_ascii_art=True, source_tree=True):
     """Run `python -m ascii_art args` (or a raw python command) on a pty.
 
     `steps` is a list of (delay_seconds, bytes | ("resize", rows, cols)) actions. Returns (exit code, output).
     """
     master, slave = os.openpty()
     set_size(master, *size)
-    full_env = {"PATH": os.environ["PATH"], "HOME": os.environ["HOME"], "PYTHONPATH": SRC, "COLORTERM": "truecolor", "TERM": "xterm-256color"}
+    full_env = {"PATH": os.environ["PATH"], "HOME": os.environ["HOME"], "COLORTERM": "truecolor", "TERM": "xterm-256color"}
+    if source_tree:
+        full_env["PYTHONPATH"] = SRC
     full_env.update(env or {})
     cmd = [sys.executable, "-m", "ascii_art", *args] if use_ascii_art else list(args)
     proc = subprocess.Popen(cmd, stdin=slave, stdout=slave, stderr=slave, env=full_env, start_new_session=True,
