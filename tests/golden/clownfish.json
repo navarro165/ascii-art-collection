@@ -1,0 +1,74 @@
+{
+ "120x40 t=11.0 glow=None 256": {
+  "ansi": "d3a39117f58d409a9f1621846cc06c9a863c9c76e094370cb80fc2a45dd5d6ee",
+  "ansi_delta": "f39167a0e04de79884bf0a0fac8f3d68b3727b2f287601dc7e42b9f9072ca232",
+  "ansi_len": 19445,
+  "ansi_next": "bf9932701aaee9e07ff16f67662ae7557b613481d44f187bc02da69e66a7e0d1",
+  "chars": "7b614e4de4cb618c5f18dd2a144e2daae0c49801f70a18e794be175ebb1b2de2",
+  "ink": "e9306337034247a87653b7b9635e640d0a51a3008fabcfd1469dadf10e4b412b",
+  "next_len": 19309
+ },
+ "120x40 t=11.0 glow=None truecolor": {
+  "ansi": "2ff93f893cecad4d06702fa07b8defc567523eb42377a1b6b155a2a3e821bf72",
+  "ansi_delta": "f39167a0e04de79884bf0a0fac8f3d68b3727b2f287601dc7e42b9f9072ca232",
+  "ansi_len": 33367,
+  "ansi_next": "7d170658ae3527b00652439ccbc986071d88eb6a56b8a4dee4cb0807e73297e7",
+  "chars": "7b614e4de4cb618c5f18dd2a144e2daae0c49801f70a18e794be175ebb1b2de2",
+  "ink": "e9306337034247a87653b7b9635e640d0a51a3008fabcfd1469dadf10e4b412b",
+  "next_len": 33573
+ },
+ "120x40 t=3.0 glow=None 256": {
+  "ansi": "1bfbe8e1ab48311c025ea98676d4dc120b40ade4f62cd55141a527a787b00f78",
+  "ansi_delta": "f39167a0e04de79884bf0a0fac8f3d68b3727b2f287601dc7e42b9f9072ca232",
+  "ansi_len": 22867,
+  "ansi_next": "feed1309566789452977fd2f6b3e07f63da32a0cdb2e867dd44c6e4faa4e7581",
+  "chars": "c9b1dcd3b0574c419d390f5f3f416e8383d0a94eec8e39c776b07e8d7486ffbc",
+  "ink": "ad7dd8c2089a5c57c3c80080a2673847cb0b293a8179d1f1f61ac7f26c554cf0",
+  "next_len": 22551
+ },
+ "120x40 t=3.0 glow=None truecolor": {
+  "ansi": "53723ebab11dd59fa88952ee37dca57b45f530cef6114b93ec0ac84b303c19a9",
+  "ansi_delta": "f39167a0e04de79884bf0a0fac8f3d68b3727b2f287601dc7e42b9f9072ca232",
+  "ansi_len": 40445,
+  "ansi_next": "f93134afaebb03d1c75342655fbf56649fd3704697a1af1f4b1ed218b695bc83",
+  "chars": "c9b1dcd3b0574c419d390f5f3f416e8383d0a94eec8e39c776b07e8d7486ffbc",
+  "ink": "ad7dd8c2089a5c57c3c80080a2673847cb0b293a8179d1f1f61ac7f26c554cf0",
+  "next_len": 39995
+ },
+ "80x24 t=11.0 glow=None 256": {
+  "ansi": "53da5de410d6a08f3af109392129669610934628f76bf5b2b16549452b47b370",
+  "ansi_delta": "f39167a0e04de79884bf0a0fac8f3d68b3727b2f287601dc7e42b9f9072ca232",
+  "ansi_len": 9339,
+  "ansi_next": "205f6d01514e0f8cc21c75d2ee9f0ca3f47cf80bc8bd90ba5404edb8a50eef28",
+  "chars": "8949d79adf4987c04a2fb0475aaabee5482fc7c6b5fcef816fc60d8a14c6ccf8",
+  "ink": "1ff951deb3e70a6cc8d4adde284988d466f9dbd5473ff1c46675b3954c37843d",
+  "next_len": 9419
+ },
+ "80x24 t=11.0 glow=None truecolor": {
+  "ansi": "e7ca88e970443acfc01468bbdb88c3dc2d088c5f907d4b7eb16d69c9130fb2db",
+  "ansi_delta": "f39167a0e04de79884bf0a0fac8f3d68b3727b2f287601dc7e42b9f9072ca232",
+  "ansi_len": 15956,
+  "ansi_next": "0cc0b71a9912086625ac2d4c7a1011c0ee14409bfaa01503506ebd008494f607",
+  "chars": "8949d79adf4987c04a2fb0475aaabee5482fc7c6b5fcef816fc60d8a14c6ccf8",
+  "ink": "1ff951deb3e70a6cc8d4adde284988d466f9dbd5473ff1c46675b3954c37843d",
+  "next_len": 16048
+ },
+ "80x24 t=3.0 glow=None 256": {
+  "ansi": "d59a6a73fd4871f4f87963d0a2648e58eca88e3a50edfb5bb0f751a34d9ce9cd",
+  "ansi_delta": "f39167a0e04de79884bf0a0fac8f3d68b3727b2f287601dc7e42b9f9072ca232",
+  "ansi_len": 10569,
+  "ansi_next": "29f5d340857905b52ee91b9eca439df45aaff4f68ca2e3d9ef7246888fe62dbc",
+  "chars": "c7eda41eee7f71ea8fd0f42b5b181361b12f16190349c27ed3b6d64de3ff7990",
+  "ink": "cd7b1055079181919aee20ebe6bacb928629be4ba51f91b566d30a5d0726c9dd",
+  "next_len": 10399
+ },
+ "80x24 t=3.0 glow=None truecolor": {
+  "ansi": "6b2b734015b15ab45bc9158b56e04c0052ab9c1436e59a993eb92709e766b5d1",
+  "ansi_delta": "f39167a0e04de79884bf0a0fac8f3d68b3727b2f287601dc7e42b9f9072ca232",
+  "ansi_len": 18057,
+  "ansi_next": "e4aa3989fd73cec582e53001b51a0e5850ef3f5955d8e858a4ebcb9d1a65dca8",
+  "chars": "c7eda41eee7f71ea8fd0f42b5b181361b12f16190349c27ed3b6d64de3ff7990",
+  "ink": "cd7b1055079181919aee20ebe6bacb928629be4ba51f91b566d30a5d0726c9dd",
+  "next_len": 17680
+ }
+}

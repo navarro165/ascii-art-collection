@@ -3,12 +3,13 @@
 # requires-python = ">=3.10"
 # dependencies = ["numpy"]
 # ///
-"""Live terminal version of the ASCII Lab clownfish and anemone scene.
+"""Live terminal clownfish and anemone.
 
-Derived from clownfish.py by ASCII Lab (https://github.com/sapozhkov/ascii-lab-public).
-The fish and anemone are procedural 3D models projected onto a character grid; this
-module renders them at any terminal size. The composition was inspired by a photo by
-Nhobgood on Wikimedia Commons.
+Derived from clownfish.py in ASCII Lab by Alexandr Sapozhkov (https://github.com/sapozhkov/ascii-lab-public;
+reel by @ascii.lab, https://www.instagram.com/reel/Df8L4ZnN4sX/), whose composition was inspired by a
+clownfish photo on Wikimedia Commons (upstream's code credits Nhobgood, its model page cites Vardhanjp).
+The fish and anemone are procedural 3D models projected onto a character grid; this module renders them
+at any terminal size. Terminal renderer and dynamic sizing by navarro165. No licence upstream; see the README.
 """
 import argparse
 import atexit
@@ -1097,15 +1098,15 @@ def run_live(fps=15.0, aspect=None, speed=1.0, colours=None, mouse_exit=False, s
         restore()
 
 
-def main():
-    parser = argparse.ArgumentParser(description="ASCII clownfish screensaver for your terminal. Press any key to quit.")
+def main(argv=None, prog=None):
+    parser = argparse.ArgumentParser(prog=prog, description="ASCII clownfish screensaver for your terminal. Press any key to quit.")
     parser.add_argument("--fps", type=float, default=15.0, help="frames per second (default 15)")
     parser.add_argument("--aspect", type=float, help="cell height / width (default: detected, else 2.0)")
     parser.add_argument("--speed", type=float, default=1.0, help="animation speed (default 1.0)")
     parser.add_argument("--colors", choices=("truecolor", "256"), help="colour depth (default: from $COLORTERM)")
     parser.add_argument("--mouse-exit", action="store_true", help="moving the mouse also quits")
     parser.add_argument("--seconds", type=float, help="quit by itself after this long")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     run_live(args.fps, args.aspect, args.speed, args.colors, args.mouse_exit, args.seconds)
 
 
