@@ -1,0 +1,29 @@
+[project]
+name = "ascii-art-collection"
+dynamic = ["version"]
+description = "Live terminal ASCII art: a clownfish and two Christmas trees, one command with a menu."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy"]
+
+[project.scripts]
+ascii-art = "ascii_art.cli:main"
+clownfish = "ascii_art.cli:main"
+xmas-tree = "ascii_art.cli:main"
+xmas-tree-v1 = "ascii_art.cli:main"
+
+[dependency-groups]
+dev = ["pillow", "pytest", "pyinstaller"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/ascii_art/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ascii_art"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
