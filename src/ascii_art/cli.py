@@ -40,17 +40,21 @@ def resolve(word):
     """Return the art named by `word` (exact, else a unique prefix) or None."""
     if word in ARTS:
         return word
-    matches = [name for name in ARTS if name.startswith(word)]
+    matches = [name for name in ARTS if word and name.startswith(word)]
     return matches[0] if len(matches) == 1 else None
 
 
 def run(name, argv, prog):
-    ARTS[name].module.main(argv, prog=prog)
+    """Run one art; Ctrl-C quits quietly, since the art has already put the terminal back by then."""
+    try:
+        ARTS[name].module.main(argv, prog=prog)
+    except KeyboardInterrupt:
+        return 130
     return 0
 
 
 def menu():
-    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+    if not (sys.stdin and sys.stdout and sys.stdin.isatty() and sys.stdout.isatty()):
         print("ascii-art needs a terminal for its menu. Name an art instead:\n" + listing(), file=sys.stderr)
         return 2
     choice = selector.choose([(name, art.blurb, art.credit) for name, art in ARTS.items()])
@@ -76,7 +80,7 @@ def main(argv=None):
         return 0
     name = resolve(head)
     if name is None:
-        close = [n for n in ARTS if n.startswith(head)]
+        close = [n for n in ARTS if head and n.startswith(head)]
         print(f"ascii-art: {'ambiguous' if close else 'unknown'} art {head!r}" + (f" (could be {', '.join(close)})" if close else ""), file=sys.stderr)
         print(listing(), file=sys.stderr)
         return 2

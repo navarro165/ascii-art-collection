@@ -6,10 +6,10 @@
 """Live terminal clownfish and anemone.
 
 Derived from clownfish.py in ASCII Lab by Alexandr Sapozhkov (https://github.com/sapozhkov/ascii-lab-public;
-reel by @ascii.lab, https://www.instagram.com/reel/Df8L4ZnN4sX/), whose composition was inspired by a photo
-by Nhobgood on Wikimedia Commons. The fish and anemone are procedural 3D models projected onto a character
-grid; this module renders them at any terminal size. Terminal renderer and dynamic sizing by navarro165.
-No licence upstream; see the README.
+reel by @ascii.lab, https://www.instagram.com/reel/Df8L4ZnN4sX/), whose composition was inspired by a
+clownfish photo on Wikimedia Commons (upstream's code credits Nhobgood, its model page cites Vardhanjp).
+The fish and anemone are procedural 3D models projected onto a character grid; this module renders them
+at any terminal size. Terminal renderer and dynamic sizing by navarro165. No licence upstream; see the README.
 """
 import argparse
 import atexit

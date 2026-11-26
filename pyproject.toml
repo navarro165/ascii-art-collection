@@ -5,6 +5,10 @@ description = "Live terminal ASCII art: a clownfish and two Christmas trees, one
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["numpy"]
+authors = [{ name = "navarro165" }]
+
+[project.urls]
+Homepage = "https://github.com/navarro165/ascii-art-collection"
 
 [project.scripts]
 ascii-art = "ascii_art.cli:main"
@@ -13,7 +17,7 @@ xmas-tree = "ascii_art.cli:main"
 xmas-tree-v1 = "ascii_art.cli:main"
 
 [dependency-groups]
-dev = ["pillow", "pytest", "pyinstaller"]
+dev = ["pillow", "pytest"]
 
 [build-system]
 requires = ["hatchling"]

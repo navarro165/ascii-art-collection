@@ -21,7 +21,7 @@ def sha(data):
 
 
 def frames(kind):
-    """Yield (key, chars, ink, ansi digests) in the same order and with the same parameters as the capture."""
+    """Yield (key, chars, ink, full frame, re-encoded same frame, delta to the next frame) in the same order and with the same parameters as the capture."""
     for cols, rows in SIZES:
         if kind == "clownfish":
             clownfish.configure(cols, rows, 2.0)
@@ -34,30 +34,36 @@ def frames(kind):
             for t in times:
                 if kind == "clownfish":
                     chars, ink = clownfish.grid(t)
-                    info, extra = None, []
+                    chars2, ink2 = clownfish.grid(t + 0.05)
+                    extra = extra2 = []
                 elif kind == "xmas_tree":
                     chars, ink, info = xmas_tree.render(scene, t, cols, rows, asp, True, glow)
+                    chars2, ink2, info2 = xmas_tree.render(scene, t + 0.05, cols, rows, asp, True, glow)
                     extra = [info["bg"] if glow > 0 else None]
+                    extra2 = [info2["bg"] if glow > 0 else None]
                 else:
                     chars, ink, info = xmas_tree_v1.render(scene, t, cols, rows, asp, True)
-                    extra = []
+                    chars2, ink2, info2 = xmas_tree_v1.render(scene, t + 0.05, cols, rows, asp, True)
+                    extra = extra2 = []
                 to_ansi = {"clownfish": clownfish, "xmas_tree": xmas_tree, "xmas_tree_v1": xmas_tree_v1}[kind].to_ansi
                 for colours in ("truecolor", "256"):
                     data, state = to_ansi(chars, ink, None, colours, *extra)
                     data2, _ = to_ansi(chars, ink, state, colours, *extra)
-                    yield f"{cols}x{rows} t={t} glow={glow} {colours}", chars, ink, data, data2
+                    data3, _ = to_ansi(chars2, ink2, state, colours, *extra2)
+                    yield f"{cols}x{rows} t={t} glow={glow} {colours}", chars, ink, data, data2, data3
 
 
 @pytest.mark.parametrize("kind", ["clownfish", "xmas_tree", "xmas_tree_v1"])
 def test_frames_match_original(kind):
     golden = json.loads((GOLDEN / f"{kind}.json").read_text())
     seen = 0
-    for key, chars, ink, data, data2 in frames(kind):
+    for key, chars, ink, data, data2, data3 in frames(kind):
         want = golden[key]
         assert digest(chars) == want["chars"], key
         assert digest(ink) == want["ink"], key
         assert sha(data) == want["ansi"], key
         assert len(data) == want["ansi_len"], key
         assert sha(data2) == want["ansi_delta"], key
+        assert sha(data3) == want["ansi_next"] and len(data3) == want["next_len"], key
         seen += 1
     assert seen == len(golden)

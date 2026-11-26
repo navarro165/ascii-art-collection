@@ -2,12 +2,15 @@
 # Install the bundle built by build_binary.sh: copy it under $PREFIX/<version> and link one command per art
 # into $BIN_DIR. Refuses to replace a command that was not linked by a previous run of this script.
 set -eu
+prefix=${PREFIX:-$HOME/.local/share/ascii-art}
+bin_dir=${BIN_DIR:-$HOME/.local/bin}
+case $prefix in /*) ;; *) prefix=$PWD/$prefix ;; esac
+case $bin_dir in /*) ;; *) bin_dir=$PWD/$bin_dir ;; esac
 cd "$(dirname "$0")/.."
 bundle=dist/ascii-art
 [ -x "$bundle/ascii-art" ] || { echo "no bundle: run tools/build_binary.sh first" >&2; exit 1; }
 version=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/ascii_art/__init__.py)
-prefix=${PREFIX:-$HOME/.local/share/ascii-art}
-bin_dir=${BIN_DIR:-$HOME/.local/bin}
+[ -n "$version" ] || { echo "cannot read __version__ from src/ascii_art/__init__.py" >&2; exit 1; }
 mkdir -p "$prefix" "$bin_dir"
 for cmd in ascii-art clownfish xmas-tree xmas-tree-v1; do
     link=$bin_dir/$cmd
@@ -18,8 +21,11 @@ for cmd in ascii-art clownfish xmas-tree xmas-tree-v1; do
         esac
     fi
 done
-rm -rf "$prefix/$version"
-cp -R "$bundle" "$prefix/$version"
+# Copy beside the target first so a failed copy leaves the previous install of this version intact.
+rm -rf "$prefix/.incoming"
+cp -R "$bundle" "$prefix/.incoming"
+rm -rf "${prefix:?}/$version"
+mv "$prefix/.incoming" "$prefix/$version"
 for cmd in ascii-art clownfish xmas-tree xmas-tree-v1; do
     ln -sf "$prefix/$version/ascii-art" "$bin_dir/$cmd"
 done

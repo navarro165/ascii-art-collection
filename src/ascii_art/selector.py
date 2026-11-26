@@ -46,6 +46,16 @@ def tokens(data):
                 yield byte.decode("latin-1")
 
 
+def read_keys(fd):
+    """Read pending input, waiting briefly for the rest of an escape sequence that was split across reads."""
+    data = os.read(fd, 1024)
+    while data[-1:] == b"\x1b" or data[-2:] in (b"\x1b[", b"\x1bO"):
+        if not select.select([fd], [], [], 0.05)[0]:
+            break
+        data += os.read(fd, 1024)
+    return data
+
+
 def clip(text, width):
     return text if len(text) <= width else text[: max(width - 1, 0)] + "…"
 
@@ -61,7 +71,7 @@ def frame(entries, index, cols, rows):
         row = f"  {i + 1}  {n}  "
         lines.append(f"{ESC}[7m{row:<{min(cols, 30)}}{ESC}[0m" if i == index else row)
     lines += ["", clip(blurb, cols - 2), clip(f"credit: {credit}", cols - 2), "", f"run directly: ascii-art {name}", "",
-              clip("up/down or j/k move, Enter run, 1-9 pick, q quit", cols - 2)]
+              clip(f"up/down or j/k move, Enter run, 1-{len(entries)} pick, q quit", cols - 2)]
     return f"{ESC}[2J{ESC}[H" + "\r\n".join(" " + line if not line.startswith(ESC) else line for line in lines[: rows - 1])
 
 
@@ -69,9 +79,14 @@ def choose(entries):
     """Show the menu on the controlling terminal; return the chosen entry's name, or None if the user quit."""
     fd_in, fd_out = sys.stdin.fileno(), sys.stdout.fileno()
     saved = termios.tcgetattr(fd_in)
-    old_winch = signal.getsignal(signal.SIGWINCH)
     dirty = [True]
-    signal.signal(signal.SIGWINCH, lambda *_: dirty.__setitem__(0, True))
+
+    def stop(signum, _frame):
+        raise SystemExit(128 + signum)
+
+    handlers = {signal.SIGWINCH: lambda *_: dirty.__setitem__(0, True)}
+    handlers.update({sig: stop for sig in (signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT, signal.SIGTSTP)})
+    old_handlers = {sig: signal.signal(sig, handler) for sig, handler in handlers.items()}
     index = 0
     try:
         tty.setcbreak(fd_in)
@@ -83,9 +98,7 @@ def choose(entries):
                 write_all(fd_out, frame(entries, index, size.columns, size.lines))
             if not select.select([fd_in], [], [], 0.2)[0]:
                 continue
-            data = os.read(fd_in, 64)
-            if data == b"\x1b" and not select.select([fd_in], [], [], 0.05)[0]:
-                return None
+            data = read_keys(fd_in)
             if not data:
                 return None
             for key in tokens(data):
@@ -97,11 +110,12 @@ def choose(entries):
                     index, dirty[0] = (index + 1) % len(entries), True
                 elif key == "enter":
                     return entries[index][0]
-                elif key.isdigit() and 1 <= int(key) <= len(entries):
+                elif key in "123456789"[: len(entries)]:
                     return entries[int(key) - 1][0]
     except KeyboardInterrupt:
         return None
     finally:
         write_all(fd_out, LEAVE)
         termios.tcsetattr(fd_in, termios.TCSADRAIN, saved)
-        signal.signal(signal.SIGWINCH, old_winch)
+        for sig, old in old_handlers.items():
+            signal.signal(sig, old)

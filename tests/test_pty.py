@@ -56,7 +56,13 @@ def run_pty(args, steps=(), size=(40, 120), env=None, timeout=15.0, use_ascii_ar
         now = time.monotonic() - start
         while pending and pending[0][0] <= now:
             _, action = pending.pop(0)
-            if isinstance(action, tuple):
+            if isinstance(action, tuple) and action[0] == "split":
+                os.write(master, action[1])
+                time.sleep(action[3])
+                os.write(master, action[2])
+            elif isinstance(action, tuple) and action[0] == "signal":
+                os.killpg(proc.pid, action[1])
+            elif isinstance(action, tuple):
                 set_size(master, action[1], action[2])
                 os.killpg(proc.pid, signal.SIGWINCH)
             else:
@@ -97,21 +103,31 @@ def test_key_press_quits_quickly(art):
     assert time.monotonic() - started < 4.0
 
 
-def test_256_colour_mode_uses_no_truecolor():
-    code, out = run_pty(["clownfish", "--colors", "256", "--seconds", "1"])
+@pytest.mark.parametrize("art", ["clownfish", "xmas-tree", "xmas-tree-v1"])
+def test_ctrl_c_quits_quietly_and_restores_terminal(art):
+    code, out = run_pty([art], steps=[(1.5, b"\x03")])
+    assert code == 130
+    assert b"Traceback" not in out and ALT_OFF in out and CURSOR_ON in out
+
+
+@pytest.mark.parametrize("art", ["clownfish", "xmas-tree", "xmas-tree-v1"])
+def test_256_colour_mode_uses_no_truecolor(art):
+    code, out = run_pty([art, "--colors", "256", "--seconds", "1"])
     assert_clean(code, out)
     assert b"38;5;" in out and b"38;2;" not in out
 
 
-def test_resize_redraws_without_error():
-    code, out = run_pty(["clownfish", "--seconds", "3"], steps=[(1.0, ("resize", 24, 80))])
+@pytest.mark.parametrize("art", ["clownfish", "xmas-tree", "xmas-tree-v1"])
+def test_resize_redraws_without_error(art):
+    code, out = run_pty([art, "--seconds", "3"], steps=[(1.0, ("resize", 24, 80))])
     assert_clean(code, out)
     assert out.count(b"\x1b[2J") >= 2
 
 
+@pytest.mark.parametrize("art", ["clownfish", "xmas-tree", "xmas-tree-v1"])
 @pytest.mark.parametrize("size", [(6, 20), (90, 300)])
-def test_extreme_sizes_do_not_crash(size):
-    assert_clean(*run_pty(["xmas-tree", "--seconds", "2"], size=size))
+def test_extreme_sizes_do_not_crash(art, size):
+    assert_clean(*run_pty([art, "--seconds", "2"], size=size))
 
 
 def test_tree_accepts_all_its_flags():
@@ -157,12 +173,35 @@ def test_menu_selection_launches_art(keys, expected):
     assert out.index(ALT_OFF) < out.index(b"RAN")
 
 
+@pytest.mark.parametrize("key", ["²".encode(), "ó".encode(), b"0", b"9", b"\x00", b"\xff"])
+def test_menu_ignores_stray_keys(key):
+    code, out = menu([(0.8, key), (1.4, b"q")])
+    assert code == 0 and b"Traceback" not in out and b"RAN" not in out
+
+
 @pytest.mark.parametrize("key", [b"q", b"\x1b", b"\x03"])
 def test_menu_quit_keys_restore_terminal(key):
     code, out = menu([(0.8, key)])
     assert code == 0
     assert b"RAN" not in out
     assert out.rstrip().endswith(ALT_OFF) and CURSOR_ON in out
+
+
+@pytest.mark.parametrize("action", [("signal", signal.SIGTERM), ("signal", signal.SIGHUP), b"\x1c"])
+def test_menu_restores_terminal_on_fatal_signals(action):
+    code, out = menu([(0.8, action)])
+    assert code != 0 and b"RAN" not in out
+    assert out.rstrip().endswith(ALT_OFF) and CURSOR_ON in out
+
+
+def test_menu_arrow_key_split_across_reads():
+    code, out = menu([(0.8, ("split", b"\x1b", b"[B", 0.02)), (1.2, b"\r")])
+    assert code == 0 and b"RAN xmas-tree " in out
+
+
+def test_menu_survives_closed_stdin():
+    code = subprocess.run(f"{sys.executable} -m ascii_art <&-", shell=True, env={**os.environ, "PYTHONPATH": SRC}, capture_output=True).returncode
+    assert code == 2
 
 
 def test_menu_redraws_on_resize_and_handles_tiny_terminal():
