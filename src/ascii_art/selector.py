@@ -13,7 +13,7 @@ import tty
 ESC = "\x1b"
 ENTER = f"{ESC}[?1049h{ESC}[?25l"
 LEAVE = f"{ESC}[0m{ESC}[?25h{ESC}[?1049l"
-MIN_COLS, MIN_ROWS = 40, 10
+MIN_COLS, MIN_ROWS = 40, 14
 KEYS = {b"\x1b[A": "up", b"\x1bOA": "up", b"\x1b[B": "down", b"\x1bOB": "down"}
 
 
@@ -26,8 +26,26 @@ def write_all(fd, text):
             select.select([], [fd], [], 0.05)
 
 
+def sequence_length(data, i):
+    """Length of the escape sequence starting at data[i], or 0 if it is cut off before its final byte."""
+    if i + 1 >= len(data):
+        return 0
+    if data[i + 1:i + 2] == b"[":
+        j = i + 2
+        while j < len(data) and 0x20 <= data[j] <= 0x3F:
+            j += 1
+        return j + 1 - i if j < len(data) else 0
+    if data[i + 1:i + 2] == b"O":
+        return 3 if i + 2 < len(data) else 0
+    return 2
+
+
 def tokens(data):
-    """Split raw input into key names: arrows, Enter, single characters; a lone Esc is 'esc'."""
+    """Split raw input into key names: arrows, Enter, single characters; a lone Esc is 'esc'.
+
+    Any other escape sequence (Home, Delete, function keys, Alt+key, mouse reports) is one 'other' token, so
+    its parameter bytes are never mistaken for keys.
+    """
     i = 0
     while i < len(data):
         for seq, key in KEYS.items():
@@ -37,19 +55,31 @@ def tokens(data):
                 break
         else:
             byte = data[i:i + 1]
-            i += 1
             if byte == b"\x1b":
-                yield "esc" if i >= len(data) else "other"
+                if i + 1 >= len(data):
+                    yield "esc"
+                    i += 1
+                else:
+                    yield "other"
+                    i += sequence_length(data, i) or len(data) - i
             elif byte in (b"\r", b"\n"):
                 yield "enter"
+                i += 1
             else:
                 yield byte.decode("latin-1")
+                i += 1
+
+
+def cut_off(data):
+    """True if the input ends in the middle of an escape sequence."""
+    i = data.rfind(b"\x1b")
+    return i >= 0 and (i + 1 == len(data) or sequence_length(data, i) == 0)
 
 
 def read_keys(fd):
     """Read pending input, waiting briefly for the rest of an escape sequence that was split across reads."""
     data = os.read(fd, 1024)
-    while data[-1:] == b"\x1b" or data[-2:] in (b"\x1b[", b"\x1bO"):
+    while cut_off(data):
         if not select.select([fd], [], [], 0.05)[0]:
             break
         data += os.read(fd, 1024)
@@ -69,10 +99,10 @@ def frame(entries, index, cols, rows):
     lines = [f"{ESC}[1mASCII ART COLLECTION{ESC}[0m", ""]
     for i, (n, _, _) in enumerate(entries):
         row = f"  {i + 1}  {n}  "
-        lines.append(f"{ESC}[7m{row:<{min(cols, 30)}}{ESC}[0m" if i == index else row)
+        lines.append(f" {ESC}[7m{row:<{min(cols, 30)}}{ESC}[0m" if i == index else row)
     lines += ["", clip(blurb, cols - 2), clip(f"credit: {credit}", cols - 2), "", f"run directly: ascii-art {name}", "",
               clip(f"up/down or j/k move, Enter run, 1-{len(entries)} pick, q quit", cols - 2)]
-    return f"{ESC}[2J{ESC}[H" + "\r\n".join(" " + line if not line.startswith(ESC) else line for line in lines[: rows - 1])
+    return f"{ESC}[2J{ESC}[H" + "\r\n".join(line if line.startswith((ESC, " ")) else " " + line for line in lines[: rows - 1])
 
 
 def choose(entries):
@@ -86,7 +116,9 @@ def choose(entries):
 
     handlers = {signal.SIGWINCH: lambda *_: dirty.__setitem__(0, True)}
     handlers.update({sig: stop for sig in (signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT, signal.SIGTSTP)})
-    old_handlers = {sig: signal.signal(sig, handler) for sig, handler in handlers.items()}
+    old_handlers = {sig: signal.getsignal(sig) for sig in (*handlers, signal.SIGINT)}
+    for sig, handler in handlers.items():
+        signal.signal(sig, handler)
     index = 0
     try:
         tty.setcbreak(fd_in)
@@ -115,6 +147,9 @@ def choose(entries):
     except KeyboardInterrupt:
         return None
     finally:
+        # Restoring the terminal must not be interrupted half way by a second signal or Ctrl-C.
+        for sig in old_handlers:
+            signal.signal(sig, signal.SIG_IGN)
         write_all(fd_out, LEAVE)
         termios.tcsetattr(fd_in, termios.TCSADRAIN, saved)
         for sig, old in old_handlers.items():

@@ -31,6 +31,12 @@ sys.exit(cli.main(%s))
 """
 
 
+def child_setup():
+    """Give the child the pty as its controlling terminal and default Ctrl-C handling (a background job inherits SIGINT ignored)."""
+    fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+
 def set_size(fd, rows, cols):
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
 
@@ -48,7 +54,7 @@ def run_pty(args, steps=(), size=(40, 120), env=None, timeout=15.0, use_ascii_ar
     full_env.update(env or {})
     cmd = [sys.executable, "-m", "ascii_art", *args] if use_ascii_art else list(args)
     proc = subprocess.Popen(cmd, stdin=slave, stdout=slave, stderr=slave, env=full_env, start_new_session=True,
-                            preexec_fn=lambda: fcntl.ioctl(0, termios.TIOCSCTTY, 0))
+                            preexec_fn=child_setup)
     os.close(slave)
     out, start = b"", time.monotonic()
     pending = sorted(steps, key=lambda s: s[0])
@@ -79,6 +85,7 @@ def run_pty(args, steps=(), size=(40, 120), env=None, timeout=15.0, use_ascii_ar
             break
         if now > timeout:
             proc.kill()
+            os.close(master)
             pytest.fail(f"timed out; output tail: {out[-300:]!r}")
     os.close(master)
     return proc.wait(), out
@@ -187,16 +194,36 @@ def test_menu_quit_keys_restore_terminal(key):
     assert out.rstrip().endswith(ALT_OFF) and CURSOR_ON in out
 
 
-@pytest.mark.parametrize("action", [("signal", signal.SIGTERM), ("signal", signal.SIGHUP), b"\x1c"])
+@pytest.mark.parametrize("action", [("signal", signal.SIGTERM), ("signal", signal.SIGHUP), b"\x1c", b"\x1a"])
 def test_menu_restores_terminal_on_fatal_signals(action):
     code, out = menu([(0.8, action)])
     assert code != 0 and b"RAN" not in out
     assert out.rstrip().endswith(ALT_OFF) and CURSOR_ON in out
 
 
+@pytest.mark.parametrize("second", [("signal", signal.SIGTERM), ("signal", signal.SIGHUP), ("signal", signal.SIGINT)])
+def test_signal_while_leaving_menu_still_restores_termios(second):
+    """A second signal right after `q` must not abort the termios restore."""
+    code, out = menu([(0.8, b"q"), (0.8, second)])
+    assert out.rstrip().endswith(ALT_OFF)
+    assert b"Traceback" not in out
+
+
 def test_menu_arrow_key_split_across_reads():
     code, out = menu([(0.8, ("split", b"\x1b", b"[B", 0.02)), (1.2, b"\r")])
     assert code == 0 and b"RAN xmas-tree " in out
+
+
+@pytest.mark.parametrize("keys", [b"\x1b[3~", b"\x1b[1~", b"\x1b[1;5B", b"\x1b[15~", b"\x1bj", b"\x1b[<0;5;5M", b"\x1bOP"])
+def test_menu_ignores_unrecognised_escape_sequences(keys):
+    code, out = menu([(0.8, keys), (1.4, b"q")])
+    assert code == 0 and b"RAN" not in out and b"Traceback" not in out
+
+
+@pytest.mark.parametrize("first,second", [(b"\x1b[", b"B"), (b"\x1bO", b"B"), (b"\x1b[1;", b"5B")])
+def test_menu_sequence_split_after_bracket(first, second):
+    code, out = menu([(0.8, ("split", first, second + b"\r", 0.02))])
+    assert code == 0 and (b"RAN xmas-tree " in out or b"RAN clownfish" in out)
 
 
 def test_menu_survives_closed_stdin():

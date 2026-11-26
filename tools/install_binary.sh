@@ -4,23 +4,25 @@
 set -eu
 prefix=${PREFIX:-$HOME/.local/share/ascii-art}
 bin_dir=${BIN_DIR:-$HOME/.local/bin}
+prefix=${prefix%/}
+bin_dir=${bin_dir%/}
 case $prefix in /*) ;; *) prefix=$PWD/$prefix ;; esac
 case $bin_dir in /*) ;; *) bin_dir=$PWD/$bin_dir ;; esac
 cd "$(dirname "$0")/.."
 bundle=dist/ascii-art
 [ -x "$bundle/ascii-art" ] || { echo "no bundle: run tools/build_binary.sh first" >&2; exit 1; }
-version=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/ascii_art/__init__.py)
-[ -n "$version" ] || { echo "cannot read __version__ from src/ascii_art/__init__.py" >&2; exit 1; }
-mkdir -p "$prefix" "$bin_dir"
+version=$(sed -n 's/^__version__ = "\([A-Za-z0-9][A-Za-z0-9._+-]*\)".*$/\1/p' src/ascii_art/__init__.py | head -n 1)
+[ -n "$version" ] || { echo "cannot read a plain __version__ (letters, digits, . _ + -) from src/ascii_art/__init__.py" >&2; exit 1; }
 for cmd in ascii-art clownfish xmas-tree xmas-tree-v1; do
     link=$bin_dir/$cmd
     if [ -e "$link" ] || [ -L "$link" ]; then
         case $(readlink "$link" 2>/dev/null || true) in
             "$prefix"/*) ;;
-            *) echo "refusing to replace $link (not from this installer); remove it first" >&2; exit 1 ;;
+            *) echo "refusing to replace $link (not linked by this installer under $prefix); remove it first" >&2; exit 1 ;;
         esac
     fi
 done
+mkdir -p "$prefix" "$bin_dir"
 # Copy beside the target first so a failed copy leaves the previous install of this version intact.
 rm -rf "$prefix/.incoming"
 cp -R "$bundle" "$prefix/.incoming"

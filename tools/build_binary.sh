@@ -8,7 +8,6 @@ trap 'rm -rf "$work"' EXIT
 # A uv-managed Python is self-contained, so the bundle does not link a Homebrew or system libpython.
 uv venv -q --managed-python "$work/venv"
 uv pip install -q --python "$work/venv/bin/python" . pyinstaller
-rm -rf dist/ascii-art
 "$work/venv/bin/pyinstaller" --noconfirm --clean --onedir --name ascii-art \
     --distpath dist --workpath "$work/build" --specpath "$work" \
     --collect-submodules ascii_art tools/_bundle_entry.py

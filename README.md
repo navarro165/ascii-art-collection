@@ -84,7 +84,7 @@ size and a bigger terminal simply shows more of the reef. The tree adds points a
 uv run --group dev pytest                                 # frame parity, pty and menu tests
 uv run --group dev python tools/make_images.py            # regenerate docs/images (needs the Menlo or DejaVu Sans Mono font)
 uv run --group dev python tools/make_images.py --sheet    # contact sheet of clownfish frames, to pick one
-uv run python tools/smoke_installed.py ~/.local/bin       # run every installed command (or a bundle's links) on a pty
+uv run --group dev python tools/smoke_installed.py ~/.local/bin       # run every installed command (or a bundle's links) on a pty
 ```
 
 `tests/test_parity.py` checks that sampled frames, and the delta to the next frame, match bit for bit what the

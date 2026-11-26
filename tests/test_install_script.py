@@ -51,3 +51,20 @@ def test_refuses_to_replace_a_foreign_command(tmp_path):
     result = install(repo, tmp_path, PREFIX=str(tmp_path / "share"), BIN_DIR=str(bin_dir))
     assert result.returncode == 1 and "refusing" in result.stderr
     assert not (tmp_path / "share" / "0.1.0").exists()
+
+
+def test_version_line_with_trailing_comment_is_read_cleanly(tmp_path):
+    repo = fake_repo(tmp_path, '__version__ = "1.0"  # bump me')
+    result = install(repo, tmp_path, PREFIX=str(tmp_path / "share"), BIN_DIR=str(tmp_path / "bin"))
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / "share" / "1.0" / "ascii-art").exists()
+
+
+def test_path_like_version_is_rejected_before_anything_is_removed(tmp_path):
+    for bad in ('__version__ = "../evil"', '__version__ = ".."', '__version__ = "a/b"'):
+        repo = fake_repo(tmp_path / bad.replace("/", "_").replace(" ", "").replace('"', "").replace("=", "_"), bad)
+        victim = tmp_path / "victim"
+        victim.mkdir(exist_ok=True)
+        (victim / "f").write_text("x")
+        result = install(repo, tmp_path, PREFIX=str(tmp_path / "share"), BIN_DIR=str(tmp_path / "bin"))
+        assert result.returncode != 0 and (victim / "f").exists()
